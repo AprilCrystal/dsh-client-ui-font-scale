@@ -1,7 +1,6 @@
 {
   "name": "dsh-client-ui-font-scale",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Conversation font-size controls for the DeepSeek Harness Web UI: a composer-row stepper, keyboard shortcuts, and Ctrl+wheel zoom, all writing through the theme service's setFontSize",
   "exports": {
