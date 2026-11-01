@@ -19,8 +19,8 @@ This plugin does not replace or reimplement it. It adds the input surfaces that 
 - there is no keyboard shortcut for it anywhere in the shipped shortcuts registry;
 - there is no wheel gesture for it.
 
-Every control here writes through the **same** `theme.setFontSize` entry point the shipped row uses,
-so the two can never disagree.
+Every control here writes through the **same** `theme.setFontSize('text', px)` entry point the shipped
+row uses, so the two can never disagree.
 
 ## What it does
 
@@ -38,8 +38,9 @@ made in the shipped settings row updates this control immediately, and vice vers
 
 - DeepSeek Harness with the Web client (the `desktop` profile, or any profile mounting
   `@deepseek-ai/dsh-web-app`).
-- A theme service that exposes `setFontSize` — i.e. `@deepseek-ai/dsh-client-ui-theme`, which ships
-  in the default composition.
+- A theme service that exposes `setFontSize(role, px)` — i.e. `@deepseek-ai/dsh-client-ui-theme`,
+  which ships in the default composition. **DSH 0.2.1 or newer**: that release split the single font
+  size into the `text` / `code` / `terminal` roles, and this plugin drives `text`.
 - No build step and no runtime dependencies beyond the browser module table.
 
 ## Install
@@ -87,7 +88,7 @@ time, so a page that was already open does not pick up a newly installed bundle.
 
 This plugin stores nothing, deliberately.
 
-`theme.setFontSize(px)` writes through the `ui-theme` settings scope on the Host
+`theme.setFontSize('text', px)` writes through the `ui-theme` settings scope on the Host
 (`this.host.set('fontSize', px)`), and `@deepseek-ai/dsh-client-ui-theme`'s Host half re-embeds that
 durable value into **every index render** as a boot script. The result:
 
@@ -114,11 +115,29 @@ setting, which is why this plugin does not.
 | Concern | Mechanism |
 |---|---|
 | Seat | `ctx.slots.register` into `conversation.input.right` (a list slot, `replaceRisk: none`, empty in the default composition) |
-| Read | `theme.getTheme().fontSize`, re-rendered on the `theme/change` event |
-| Write | `theme.setFontSize(px)` — the only font-size write entry |
+| Read | `theme.getTheme().fontSizes.text`, re-rendered on the `theme/change` event |
+| Write | `theme.setFontSize('text', px)` — the only font-size write entry |
 | Keys | `ctx.shortcuts.register`, so bindings appear on the Shortcuts settings page and stay user-rebindable |
 | Locale | `ctx.locale.register` + `ctx.locale.bind`; the readout and labels follow the active locale |
 | Styles | one `<style>` element inserted in `ctx.effect`, removed on dispose |
+
+### The font-size API changed in DSH 0.2.1
+
+Before that release the theme service carried one `fontSize` and `setFontSize(px)` wrote it. Since
+then the snapshot is `fontSizes: Record<'text' | 'code' | 'terminal', number>` and the write is
+`setFontSize(role, px)`.
+
+This plugin had been written against the old shape, and the mismatch failed in a way worth recording
+because it produced no visible error surface:
+
+- reading `.fontSize` returned `undefined`, so the readout fell back to the default and showed
+  `14px` no matter what the real size was;
+- `setFontSize(15)` passed `15` as the ROLE, so the service looked up `FONT_SIZE_SPECS[15]`, got
+  `undefined`, and threw while formatting its own message — `spec.min` on an undefined spec. Every
+  click, wheel step and shortcut died before writing anything.
+
+The fix is the two lines in `lib/client.js` (`fontSizes?.[ROLE]` and `setFontSize(ROLE, next)`);
+`ROLE` is `'text'`, whose 10..22 range and 14 default are unchanged.
 
 Two ordering details are load-bearing:
 
